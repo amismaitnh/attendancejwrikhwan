@@ -2013,9 +2013,9 @@ async function deleteSignature(name) {
     document.addEventListener('keydown', closeOnEscape);
 }
             
-// MAIN DOWNLOAD FUNCTION - PDF GENERATION
+// REPLACE downloadPaper function with this fixed version
 function downloadPaper() {
-    const element = document.getElementById('report-container');
+    const paperElement = document.getElementById('print-paper'); // Ambil seluruh kertas A4
     const buttons = document.querySelectorAll('#clear-signatures, #download-paper, .page-toggle-section, .btn-hamburger-menu');
     buttons.forEach(b => b.style.display = 'none');
     
@@ -2023,21 +2023,35 @@ function downloadPaper() {
     document.getElementById('deleteModal').style.display = 'none';
     
     // Force perfect rendering
-    void element.offsetHeight;
+    void paperElement.offsetHeight;
     
-    html2canvas(element, {
-        scale: 3, // Higher scale for better quality in PDF
+    // Konfigurasi untuk capture seluruh kertas A4
+    const options = {
+        scale: 3, // Higher scale for better quality
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        width: element.scrollWidth,
-        height: element.scrollHeight,
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight,
+        width: 210 * 3.78, // 210mm in pixels (1mm = 3.78px at 96 DPI)
+        height: 297 * 3.78, // 297mm in pixels
+        windowWidth: 210 * 3.78,
+        windowHeight: 297 * 3.78,
         imageRendering: 'pixelated',
         allowTaint: false,
-        foreignObjectRendering: false
-    }).then(canvas => {
+        foreignObjectRendering: false,
+        onclone: function(clonedDoc) {
+            // Pastikan semua elemen ditampilkan dengan benar
+            const clonedPaper = clonedDoc.getElementById('print-paper');
+            if (clonedPaper) {
+                clonedPaper.style.width = '210mm';
+                clonedPaper.style.height = '297mm';
+                clonedPaper.style.padding = '20mm';
+                clonedPaper.style.boxSizing = 'border-box';
+                clonedPaper.style.overflow = 'visible';
+            }
+        }
+    };
+    
+    html2canvas(paperElement, options).then(canvas => {
         buttons.forEach(b => b.style.display = '');
         
         // Create PDF
@@ -2048,13 +2062,13 @@ function downloadPaper() {
             format: 'a4'
         });
         
-        // Calculate dimensions to fit A4 page
+        // Calculate dimensions - pastikan sesuai A4
         const imgWidth = 210; // A4 width in mm
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgHeight = 297; // A4 height in mm
         
-        // Add image to PDF
+        // Add image to PDF - cover seluruh halaman
         const imgData = canvas.toDataURL('image/png', 1.0);
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, '', 'FAST');
         
         // Generate filename
         const pageSuffix = displayMode === 'one-page' ? '_full' : `_page${currentPage}`;
@@ -2066,7 +2080,7 @@ function downloadPaper() {
         
     }).catch(err => {
         buttons.forEach(b => b.style.display = '');
-        console.error(err);
+        console.error('Download error:', err);
         alert('Gagal membuat PDF. Coba refresh halaman.');
     });
 }
