@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Form</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="navbar.css">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@24..48,100..700,0..1">
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+    </nav>
+    
+    <!-- Page Toggle Section -->
+    <!-- <div class="page-toggle-section">
+        <div class="toggle-container">
+            <a href="index.html"><span class="toggle-icon material-symbols-outlined">chevron_left</span></a>
+        </div>
+    </div> -->    
+    
+    <section class="signature-form-section">
+        <h2>Signature Form</h2>
+        <form id="signatureForm" class="signature-form">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <select id="name" required>
+                    <option value="" disabled selected>Select your name</option>
+                    <!-- Dynamically populated by JavaScript -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Signature:</label>
+                <canvas id="signatureCanvas" width="400" height="150"></canvas>
+            </div>
+            <div class="button-group">
+                <button type="button" id="clearSignature" class="btn-secondary">Clear Signature</button>
+                <button type="submit" class="btn-primary">Save Signature</button>
+            </div>
+        </form>
+    </section>
+    <style>
+        /* signature.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+        :root {
+            --primary: #736b23;
+            --secondary: #9ade24;
+            --accent: #f5de3e;
+            --light: #ecf0f1;
+            --dark: #0d0a06;
+            --text: #333;
+            --text-light: #777;
+            --gold: #FFD700;
+            --silver: #C0C0C0;
+            --bronze: #CD7F32;
+        }
+        
+        .org-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease;
+}
+
+.org-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.org-modal-content {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 420px;
+    width: 92%;
+}
+
+.org-modal-content h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.org-subtitle {
+    color: var(--text-light);
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.org-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.org-btn {
+    padding: 20px 12px;
+    background: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    cursor: none;
+}
+
+.org-btn:hover {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+    box-shadow: 0 12px 25px rgba(154,222,36,0.35);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .org-options { grid-template-columns: 1fr; }
+    .org-modal-content { padding: 35px 25px; }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .org-options {
+        grid-template-columns: 1fr;
+    }
+    .org-modal-content {
+        padding: 30px 20px;
+    }
+}
+        
+/* Sync Notification Styles */
+.sync-notification {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background: var(--secondary);
+    color: white;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+.sync-notification.error {
+    background: #ff6b6b;
+}
+
+.sync-notification.success {
+    background: #6bcf7f;
+}
+
+.sync-notification.warning {
+    background: #ffd93d;
+    color: #333;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Sync Status Indicator */
+#sync-status-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    z-index: 9999;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+#sync-status-indicator:hover {
+    transform: scale(1.2);
+}
+
+/* Manual Sync Button */
+.btn-sync {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--secondary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.btn-sync:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+}
+
+.btn-sync.syncing {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    color: #FFFFFF;
+    background-color: white;
+    margin: 0;
+    overflow-x: hidden;
+    font-weight: 400;
+}
+
+        /* Page Toggle - Fixed Position on Left Side */
+        .page-toggle-section {
+            position: fixed;
+            top: 0;
+            left: 20px;
+            right: auto;
+            transform: none;
+            z-index: 1001;
+            background: transparent;
+            padding: 0;
+            box-shadow: none;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            margin: 0;
+        }
+        
+        .page-toggle-section .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: transparent;
+        }
+        
+        .page-toggle-section .toggle-icon {
+            font-size: 40px;
+            margin-top: 7px;
+            cursor: none;
+            padding: 8px;
+            border-radius: 50%;
+            color: var(--text);
+            background: transparent;
+            display: inline-block;
+        }
+        
+        .page-toggle-section .toggle-label {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 14px;
+            margin: 0;
+            margin-top: -10px;
+        }
+
+        /* Button Styles */
+        .btn-hamburger-menu {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: none;
+            background: transparent;
+            border: none;
+            z-index: 1001;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .btn-hamburger-menu:hover {
+            color: var(--secondary);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-download-paper {
+            position: fixed;
+            right: 70px;
+            padding: 7px;
+            border-radius: 5px;
+            cursor: none;
+            background: transparent;
+            border: none;
+            z-index: 1001;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .btn-download-paper:hover {
+            color: var(--secondary);
+        }
+
+        /* Hamburger Menu Styles */
+        .btn-hamburger-menu {
+            position: fixed;
+            right: 20px;
+            padding: 7px;
+            border-radius: 5px;
+            cursor: none;
+            background: transparent;
+            border: none;
+            z-index: 1001;
+            color: var(--text);
+            transition: all 0.3s ease;
+        }
+
+        .btn-hamburger-menu:hover {
+            color: var(--secondary);
+        }
+
+        .dropdown-menu {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1002;
+            display: none;
+            min-width: 150px;
+            overflow: hidden;
+            animation: dropdownFadeIn 0.2s ease-out;
+        }
+
+        @keyframes dropdownFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            cursor: none;
+            color: var(--text);
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--secondary);
+            color: var(--light);
+        }
+
+        .dropdown-item.active {
+            background: var(--secondary);
+            color: var(--light);
+        }
+
+        /* Overlay to close dropdown when clicking outside */
+        .dropdown-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 1000;
+            display: none;
+        }
+
+.signature-form-section {
+    padding: 80px 20px;
+    max-width: 600px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.signature-form-section h2 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    color: var(--text);
+    text-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    margin-bottom: 20px;
+    margin-top: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.signature-form-section p {
+    font-size: 1rem;
+    color: #FFFFFF;
+    margin-bottom: 30px;
+}
+
+.signature-form {
+    background-color: #FFFFFF;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.signature-form:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.form-group select, .form-group canvas {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-family: 'Poppins', sans-serif;
+    color: var(--text);
+    background-color: #FFFFFF;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.form-group select:focus, .form-group canvas:focus {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    outline: none;
+}
+
+.form-group canvas {
+    background-color: #FFFFFF;
+    width: 100%;
+    height: 280px;
+}
+
+.button-group {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.btn-primary {
+    display: inline-block;
+padding: 12px 30px;
+background: var(--secondary);
+color: white;
+border: none;
+border-radius: 5px;
+cursor: none;
+text-decoration: none;
+font-size: 1rem;
+font-weight: 600;
+transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: var(--primary);
+box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary {
+    display: inline-block;
+padding: 12px 30px;
+background: var(--secondary);
+color: white;
+border: none;
+border-radius: 5px;
+cursor: none;
+text-decoration: none;
+font-size: 1rem;
+font-weight: 600;
+transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--primary);
+box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .signature-form-section h2 {
+        font-size: 2rem;
+    }
+
+    .signature-form {
+        padding: 20px;
+    }
+
+    .form-group label, .form-group select, .form-group canvas {
+        font-size: 12px;
+    }
+
+    .btn-primary, .btn-secondary {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
+
+                .btn-delete,
+                .btn-cancel {
+                    padding: 12px 24px;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    font-weight: bold;
+                    cursor: none;
+                    transition: all 0.2s ease;
+                    font-family: 'Times New Roman', Times, serif;
+                }
+                
+                .btn-delete {
+                    background-color: white;
+                    color: red;
+                }
+                
+                .btn-delete:hover {
+                    background-color: red;
+                    color: white;
+                }
+                
+                .btn-cancel {
+                    background-color: white;
+                    color: black;
+                }
+                
+                .btn-cancel:hover {
+                    background-color: black;
+                    color: white;
+                }
+                /* firebase-ui.css - CSS untuk Firebase UI elements */
+/* Sync Status Indicator */
+#sync-status-indicator {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    z-index: 9999;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+#sync-status-indicator:hover {
+    transform: scale(1.2);
+}
+
+#sync-status-indicator.online {
+    background: #6bcf7f;
+}
+
+#sync-status-indicator.offline {
+    background: #ff6b6b;
+}
+
+#sync-status-indicator.pending {
+    background: #ffd93d;
+    animation: pulse 1s infinite;
+}
+
+/* LOGIN MODAL - SAME DESIGN AS ORG MODAL */
+#firebase-login-modal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    z-index: 9999 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    backdrop-filter: blur(5px) !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: all 0.4s ease !important;
+}
+
+#firebase-login-modal.show {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    animation: fadeIn 0.3s ease !important;
+}
+
+.firebase-login-modal-content {
+    background: white !important;
+    padding: 40px 30px !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3) !important;
+    text-align: center !important;
+    max-width: 420px !important;
+    width: 92% !important;
+    transform: scale(0.9) !important;
+    animation: modalPop 0.5s ease-out forwards !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.firebase-login-modal-content h3 {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    margin-bottom: 8px !important;
+}
+
+.firebase-login-subtitle {
+    color: var(--text-light) !important;
+    margin-bottom: 25px !important;
+    font-size: 14px !important;
+}
+
+/* Input Groups */
+.firebase-login-input-group {
+    margin-bottom: 20px !important;
+    text-align: left !important;
+}
+
+.firebase-login-input-group label {
+    display: block !important;
+    margin-bottom: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--text) !important;
+}
+
+.firebase-login-input {
+    width: 100% !important;
+    padding: 14px 16px !important;
+    border: 2px solid #ddd !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    font-family: 'Poppins', sans-serif !important;
+    transition: all 0.3s ease !important;
+    background: #f8f9fa !important;
+    color: var(--text) !important;
+    box-sizing: border-box !important;
+}
+
+.firebase-login-input:focus {
+    outline: none !important;
+    background: white !important;
+}
+
+/* Error Message */
+#firebase-login-error {
+    color: #e74c3c !important;
+    font-size: 13px !important;
+    margin: 10px 0 15px 0 !important;
+    min-height: 18px !important;
+    text-align: center !important;
+    font-weight: 500 !important;
+}
+
+/* Button Groups */
+.firebase-login-button-group {
+    display: flex !important;
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+}
+
+.firebase-login-btn, .firebase-register-btn {
+    flex: 1 !important;
+    padding: 14px !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.firebase-login-btn {
+    background: var(--secondary) !important;
+    color: white !important;
+}
+
+.firebase-login-btn:hover {
+    background: var(--primary) !important;
+}
+
+.firebase-register-btn {
+    background: #f0f0f0 !important;
+    color: var(--text) !important;
+}
+
+.firebase-register-btn:hover {
+    background: #e0e0e0 !important;
+}
+
+/* Continue Offline */
+.firebase-continue-offline {
+    text-align: center !important;
+    margin-top: 20px !important;
+    padding-top: 20px !important;
+    border-top: 1px solid #eee !important;
+}
+
+.firebase-continue-btn {
+    background: none !important;
+    border: none !important;
+    color: #666 !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    text-decoration: underline !important;
+    font-family: 'Poppins', sans-serif !important;
+    padding: 8px !important;
+    transition: all 0.3s ease !important;
+}
+
+.firebase-continue-btn:hover {
+    color: var(--secondary) !important;
+}
+
+/* Close Button */
+.firebase-login-close-btn {
+    margin-top: 20px !important;
+    padding: 10px 20px !important;
+    background: #f0f0f0 !important;
+    color: var(--text) !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-family: 'Poppins', sans-serif !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+.firebase-login-close-btn:hover {
+    background: #e0e0e0 !important;
+}
+
+/* Show Password Toggle */
+.firebase-show-password {
+    position: absolute !important;
+    right: 12px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    color: var(--text-light) !important;
+    padding: 5px !important;
+    border-radius: 50% !important;
+    transition: all 0.2s ease !important;
+}
+
+.firebase-show-password:hover {
+    color: var(--text) !important;
+}
+
+/* Password Input Container */
+.firebase-password-container {
+    position: relative !important;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalPop {
+    from { 
+        transform: scale(0.9); 
+        opacity: 0; 
+    }
+    to { 
+        transform: scale(1); 
+        opacity: 1; 
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    .firebase-login-modal-content {
+        padding: 30px 20px !important;
+    }
+    
+    .firebase-login-button-group {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .firebase-login-input {
+        padding: 12px 14px !important;
+        font-size: 14px !important;
+    }
+}
+
+/* Sync Button */
+#firebase-sync-button {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--secondary);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    cursor: pointer;
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+#firebase-sync-button:hover {
+    background: var(--primary);
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+
+#firebase-sync-button.syncing {
+    animation: spin 1s linear infinite;
+}
+
+/* Auth Status Indicator */
+#auth-status-indicator {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    padding: 5px 10px;
+    background: var(--secondary);
+    color: white;
+    border-radius: 4px;
+    font-size: 11px;
+    z-index: 999;
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Organization Indicator */
+#firebase-org-indicator {
+    position: fixed;
+    top: 15px;
+    left: 120px;
+    padding: 5px 10px;
+    background: rgba(255,255,255,0.9);
+    color: var(--text);
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 999;
+    font-family: 'Poppins', sans-serif;
+    display: flex;
+    align-items: center;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Notifications */
+.firebase-notification {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background: white;
+    color: #333;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+.sync-notification {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes modalPop {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+    </style>
+ <script>
+// ====================== SIGNATURE FORM FIX ======================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('signature.js: DOM loaded - FIXED VERSION');
+    
+    // 1. Initialize Signature Pad
+    const canvas = document.getElementById('signatureCanvas');
+    if (!canvas) {
+        console.error('Canvas element not found');
+        return;
+    }
+    
+    // Initialize signature pad
+    const signaturePad = new SignaturePad(canvas, {
+        backgroundColor: 'rgba(255, 255, 255, 0)',
+        penColor: 'rgb(51, 51, 51)',
+        minWidth: 2,
+        maxWidth: 4,
+        throttle: 16
+    });
+    
+    // Make signaturePad globally available
+    window.signaturePad = signaturePad;
+    
+    console.log('SignaturePad initialized');
+    
+    // 2. Resize canvas function
+    function resizeCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext('2d').scale(ratio, ratio);
+        signaturePad.clear(); // Clear on resize
+    }
+    
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas(); // Initial resize
+    
+    // 3. Populate name dropdown
+    const nameSelect = document.getElementById('name');
+    
+    function populateNameDropdown() {
+        console.log('Populating name dropdown...');
+        nameSelect.innerHTML = '<option value="" disabled selected>Select your name</option>';
+        
+        // Get names from localStorage
+        const savedNames = JSON.parse(localStorage.getItem('attendanceNames')) || [];
+        console.log('Found names:', savedNames.length);
+        
+        // Filter non-empty names
+        const validNames = savedNames.filter(name => name && name.trim() !== '');
+        console.log('Valid names:', validNames);
+        
+        // Add to dropdown
+        validNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            nameSelect.appendChild(option);
+        });
+        
+        if (validNames.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "No names found";
+            option.disabled = true;
+            nameSelect.appendChild(option);
+        }
+    }
+    
+    // Initial populate
+    populateNameDropdown();
+    
+    // 4. Clear signature button
+    document.getElementById('clearSignature').addEventListener('click', () => {
+        signaturePad.clear();
+        console.log('Signature cleared');
+    });
+    
+    // 5. FORM SUBMIT HANDLER - FIXED VERSION
+    const form = document.getElementById('signatureForm');
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault(); // Prevent page reload
+        console.log('=== FORM SUBMIT TRIGGERED ===');
+        
+        // Get form values
+        const name = nameSelect.value.trim();
+        console.log('Selected name:', name);
+        
+        // Validation
+        if (!name || name === "") {
+            alert('❌ Please select your name.');
+            console.error('No name selected');
+            return;
+        }
+        
+        if (signaturePad.isEmpty()) {
+            alert('❌ Please provide a signature.');
+            console.error('Signature is empty');
+            return;
+        }
+        
+        // Get signature as data URL
+        const signatureDataUrl = signaturePad.toDataURL('image/png');
+        console.log('Signature data URL generated (length):', signatureDataUrl.length);
+        
+        // Show loading
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.disabled = true;
+        
+        try {
+            // ========== STEP 1: Save to LocalStorage ==========
+            console.log('Step 1: Saving to localStorage...');
+            let localData = JSON.parse(localStorage.getItem('spreadsheetData')) || {};
+            
+            if (!localData[name]) {
+                localData[name] = {};
+            }
+            
+            localData[name].image = signatureDataUrl;
+            
+            // Ensure keterangan exists
+            if (!localData[name].keterangan) {
+                localData[name].keterangan = '';
+            }
+            
+            localStorage.setItem('spreadsheetData', JSON.stringify(localData));
+            console.log('✅ Saved to localStorage for:', name);
+            
+            // ========== STEP 2: Save to Firebase ==========
+            console.log('Step 2: Saving to Firebase...');
+            let firebaseResult = { success: false, error: 'Firebase not initialized' };
+            
+            if (window.dbManager && window.firebaseServices) {
+                console.log('Firebase available, attempting save...');
+                
+                // Save to Firebase using dbManager
+                firebaseResult = await window.dbManager.saveSignature(name, signatureDataUrl, '');
+                console.log('Firebase save result:', firebaseResult);
+                
+                if (firebaseResult.success && firebaseResult.synced) {
+                    console.log('✅ Signature synced to Firebase');
+                } else if (firebaseResult.queued) {
+                    console.log('📝 Signature queued for sync');
+                }
+            } else {
+                console.log('Firebase not available, saving locally only');
+            }
+            
+            // ========== STEP 3: Trigger Events ==========
+            console.log('Step 3: Triggering events...');
+            
+            // Dispatch storage event
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'spreadsheetData',
+                newValue: JSON.stringify(localData),
+                url: window.location.href
+            }));
+            
+            // Dispatch custom event
+            window.dispatchEvent(new CustomEvent('signatureSaved', {
+                detail: {
+                    name: name,
+                    image: signatureDataUrl,
+                    timestamp: Date.now(),
+                    source: 'signatureForm'
+                }
+            }));
+            
+            // Dispatch sync event
+            window.dispatchEvent(new CustomEvent('storageUpdate'));
+            
+            // ========== STEP 4: Show Success Message ==========
+            console.log('Step 4: Showing success message...');
+            
+            if (firebaseResult.success) {
+                if (firebaseResult.synced) {
+                    showNotification('✅ Signature saved and synced to cloud!', 'success');
+                } else if (firebaseResult.queued) {
+                    showNotification('📱 Signature saved locally. Will sync when online.', 'info');
+                } else {
+                    showNotification('✅ Signature saved locally.', 'success');
+                }
+            } else {
+                showNotification('✅ Signature saved locally. ' + (firebaseResult.error || ''), 'warning');
+            }
+            
+            // ========== STEP 5: Reset Form ==========
+            console.log('Step 5: Resetting form...');
+            
+            // Clear form
+            signaturePad.clear();
+            
+            // Don't clear the dropdown selection, just reset to first option
+            nameSelect.selectedIndex = 0;
+            
+            console.log('=== FORM SUBMIT COMPLETE ===');
+            
+        } catch (error) {
+            console.error('❌ Error in form submission:', error);
+            showNotification('❌ Error saving signature: ' + error.message, 'error');
+        } finally {
+            // Restore button
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+    
+    // 6. Helper function for notifications
+    function showNotification(message, type = 'info') {
+        // Remove existing notifications
+        document.querySelectorAll('.signature-notification').forEach(n => n.remove());
+        
+        const notification = document.createElement('div');
+        notification.className = `signature-notification ${type}`;
+        notification.innerHTML = `
+            <span class="material-symbols-outlined" style="margin-right: 8px; vertical-align: middle;">
+                ${type === 'success' ? 'check_circle' : 
+                  type === 'error' ? 'error' : 
+                  type === 'warning' ? 'warning' : 'info'}
+            </span>
+            <span>${message}</span>
+        `;
+        
+        notification.style.cssText = `
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-family: 'Poppins', sans-serif;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            border-left: 4px solid ${type === 'success' ? '#4CAF50' :
+                                 type === 'error' ? '#f44336' :
+                                 type === 'warning' ? '#FF9800' : '#2196F3'};
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s;
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove
+        setTimeout(() => {
+            if (notification.parentNode) notification.remove();
+        }, 10000);
+    }
+    
+    // 7. Listen for names updates from index.html
+    window.addEventListener('namesUpdate', () => {
+        console.log('Names updated, refreshing dropdown...');
+        populateNameDropdown();
+    });
+    
+    // 8. Listen for storage events
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'attendanceNames') {
+            console.log('Attendance names updated in storage');
+            populateNameDropdown();
+        }
+    });
+    
+    console.log('Signature form initialization complete');
+});
+
+// AUTO-TRIGGER LOGIN SUGGESTION FOR SIGNATURE.HTML
+(function() {
+    console.log("🚀 Initializing login suggestion trigger for signature.html");
+    
+    // Function to trigger suggestion
+    function triggerLoginSuggestion() {
+        console.log("🔄 Checking if should show login suggestion...");
+        
+        // Wait for Firebase to be ready
+        if (!window.firebaseAuth) {
+            console.log("⏳ FirebaseAuth not ready yet, retrying in 2 seconds...");
+            setTimeout(triggerLoginSuggestion, 2000);
+            return;
+        }
+        
+        // Check current user
+        const user = window.firebaseAuth.getCurrentUser();
+        const isAnonymous = !user || user.isAnonymous;
+        
+        console.log("👤 User status:", {
+            exists: !!user,
+            isAnonymous: isAnonymous,
+            email: user?.email
+        });
+        
+        // Show suggestion if anonymous
+        if (isAnonymous) {
+            console.log("✅ Conditions met - showing login suggestion");
+            
+            // Small delay for better UX
+            setTimeout(() => {
+                window.firebaseAuth.showLoginSuggestion();
+            }, 3000);
+        } else {
+            console.log("❌ Not showing - user is logged in");
+        }
+    }
+    
+    // Multiple trigger points
+    console.log("Setting up trigger points...");
+    
+    // 1. On DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log("📄 DOM ready - scheduling suggestion check");
+        setTimeout(triggerLoginSuggestion, 4000);
+    });
+    
+    // 2. On Firebase auth state change
+    window.addEventListener('authStateChanged', (event) => {
+        console.log("🔐 Auth state changed:", event.detail);
+        setTimeout(triggerLoginSuggestion, 1000);
+    });
+    
+    // 3. Fallback timer
+    setTimeout(triggerLoginSuggestion, 8000);
+    
+    // 4. When Firebase services are ready
+    const checkFirebaseReady = setInterval(() => {
+        if (window.firebaseServices?.auth) {
+            console.log("🔥 Firebase services ready");
+            clearInterval(checkFirebaseReady);
+            setTimeout(triggerLoginSuggestion, 2000);
+        }
+    }, 500);
+    
+    // 5. Manual trigger for debugging
+    window.showLoginSuggestionManual = function() {
+        console.log("🔧 Manual trigger called");
+        if (window.firebaseAuth) {
+            window.firebaseAuth.showLoginSuggestion();
+        } else {
+            console.error("FirebaseAuth not available");
+        }
+    };
+    
+    console.log("✅ Login suggestion trigger initialized");
+})();
+
+// DEBUG SCRIPT untuk signature.html
+console.log("=== SIGNATURE.HTML DEBUG START ===");
+
+// Check Firebase status
+console.log("1. Firebase Services:", window.firebaseServices ? "✅ Available" : "❌ Not Available");
+console.log("2. Firebase Auth:", window.firebaseAuth ? "✅ Available" : "❌ Not Available");
+console.log("3. Firebase DB Manager:", window.dbManager ? "✅ Available" : "❌ Not Available");
+
+// Check auth state
+if (window.firebaseAuth) {
+    const user = window.firebaseAuth.getCurrentUser();
+    console.log("4. Current User:", user);
+    console.log("5. Is Anonymous:", user?.isAnonymous);
+    console.log("6. User Profile:", window.firebaseAuth.getUserProfile());
+}
+
+// Check localStorage
+console.log("7. LocalStorage firebaseUser:", localStorage.getItem('firebaseUser'));
+console.log("8. AutoLogin Attempted:", window.firebaseAuth?.autoLoginAttempted);
+
+// Force check setelah 3 detik
+setTimeout(() => {
+    console.log("=== CHECKING AFTER 3 SECONDS ===");
+    
+    if (window.firebaseAuth) {
+        console.log("FirebaseAuth exists, checking showLoginSuggestion method...");
+        console.log("Method exists:", typeof window.firebaseAuth.showLoginSuggestion);
+        
+        // Coba panggil langsung
+        window.firebaseAuth.showLoginSuggestion();
+    } else {
+        console.log("❌ FirebaseAuth still not available");
+        
+        // Coba initialize ulang
+        if (window.firebaseServices?.auth) {
+            console.log("Re-initializing FirebaseAuth...");
+            window.firebaseAuth = new FirebaseAuthSystem();
+        }
+    }
+}, 3000);
+
+console.log("=== SIGNATURE.HTML DEBUG END ===");
+</script>
+
+// DIRECT INJECTION SCRIPT - Paste at the end of signature.html
+<script>
+// Direct injection login suggestion
+function injectLoginSuggestion() {
+    console.log("💉 Direct injection of login suggestion");
+    
+    // Check if already exists
+    if (document.getElementById('login-suggestion')) {
+        console.log("Suggestion already exists");
+        return;
+    }
+    
+    // Create suggestion
+    const suggestion = document.createElement('div');
+    suggestion.id = 'login-suggestion';
+    suggestion.innerHTML = `
+       <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; gap: 5px;">
+                <button id="direct-login-btn" style="padding: 6px 14px; background: #9ade24; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">
+                    Login
+                </button>
+            </div>
+        </div>
+    `;
+    
+    suggestion.style.cssText = `
+        position: fixed;
+        margin-bottom: 30px;
+        right: 20px;
+        background: white;
+        padding: 12px 16px;
+        border-radius: 12px;
+        z-index: 99999;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+        font-family: 'Poppins', sans-serif;
+        animation: slideUpDirect 0.5s ease;
+        max-width: 380px;
+    `;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideUpDirect {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(suggestion);
+    console.log("✅ Direct suggestion injected");
+    
+    // Add event listeners
+    document.getElementById('direct-login-btn').addEventListener('click', () => {
+        if (window.firebaseAuth) {
+            window.firebaseAuth.showLoginModal();
+        }
+        suggestion.remove();
+    });
+    
+    document.getElementById('direct-close-btn').addEventListener('click', () => {
+        suggestion.remove();
+    });
+    
+    // Auto remove
+    setTimeout(() => {
+        if (suggestion.parentNode) suggestion.remove();
+    }, 100000);
+}
+
+// Trigger after page loads
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(injectLoginSuggestion, 5000);
+});
+
+// Also trigger when Firebase is ready
+if (window.firebaseAuth) {
+    setTimeout(injectLoginSuggestion, 3000);
+}
+</script>
+
+<style>
+/* Login Suggestion Styles for signature.html */
+#login-suggestion {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    background: white !important;
+    color: #333 !important;
+    padding: 10px 15px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    z-index: 9998 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    font-family: 'Poppins', sans-serif !important;
+    display: flex !important;
+    align-items: center !important;
+    border: 1px solid #e0e0e0 !important;
+    animation: slideUp 0.3s ease !important;
+}
+
+#login-suggestion .material-symbols-outlined {
+    font-size: 16px !important;
+    margin-right: 8px !important;
+}
+
+#login-btn {
+    margin-left: 10px !important;
+    padding: 4px 12px !important;
+    background: var(--secondary) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+#login-btn:hover {
+    background: var(--primary) !important;
+    transform: scale(1.05) !important;
+}
+
+#close-suggestion {
+    background: none !important;
+    border: none !important;
+    color: #999 !important;
+    cursor: pointer !important;
+    margin-left: 5px !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    padding: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    transition: all 0.3s ease !important;
+}
+
+#close-suggestion:hover {
+    background: #f0f0f0 !important;
+    color: #333 !important;
+}
+
+/* Animation for login suggestion */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* Position adjustment for signature.html */
+.signature-form-section {
+    padding-bottom: 100px; /* Memberi ruang untuk login suggestion */
+}
+
+    /* EMERGENCY FIX for signature.html modal */
+    #passwordModal:not(.show) {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+    }
+    
+    body:not(.modal-open) {
+        overflow: auto !important;
+        position: static !important;
+    }
+    /* Organization Change Modal */
+.org-change-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease;
+}
+
+.org-change-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.org-change-modal-content {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 420px;
+    width: 92%;
+    transform: scale(0.8);
+    animation: modalPop 0.5s ease-out forwards;
+}
+
+.org-change-modal-content h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.org-change-subtitle {
+    color: var(--text-light);
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.org-change-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.org-change-btn {
+    padding: 20px 12px;
+    background: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    cursor: none;
+}
+
+.org-change-btn:hover {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .org-change-options { grid-template-columns: 1fr; }
+    .org-change-modal-content { padding: 35px 25px; }
+}
+
+.org-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease;
+}
+
+.org-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.org-modal-content {
+    background: white;
+    padding: 40px 30px;
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+    text-align: center;
+    max-width: 420px;
+    width: 92%;
+}
+
+.org-modal-content h3 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.org-subtitle {
+    color: var(--text-light);
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.org-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.org-btn {
+    padding: 20px 12px;
+    background: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    cursor: none;
+}
+
+.org-btn:hover {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+    box-shadow: 0 12px 25px rgba(154,222,36,0.35);
+}
+
+/* Mobile */
+@media (max-width: 480px) {
+    .org-options { grid-template-columns: 1fr; }
+    .org-modal-content { padding: 35px 25px; }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .org-options {
+        grid-template-columns: 1fr;
+    }
+    .org-modal-content {
+        padding: 30px 20px;
+    }
+}
+
+/* === FIX UNTUK ORG MODAL - TAMBAHKAN DI SEMUA FILE === */
+#orgModal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    z-index: 9999 !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+#orgModal.show {
+    display: flex !important;
+    animation: fadeIn 0.3s ease !important;
+}
+
+#orgChangeModal {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    z-index: 9999 !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+#orgChangeModal.show {
+    display: flex !important;
+    animation: fadeIn 0.3s ease !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Pastikan body lock berkerja */
+body.modal-open {
+    overflow: hidden !important;
+}
+
+/* Pastikan konten modal di atas */
+#orgModal .modal-content,
+#orgChangeModal .modal-content {
+    z-index: 10000 !important;
+    position: relative !important;
+}
+</style>
+
+<script src="firebase-config.js"></script>
+<script src="firebase-auth.js"></script>
+<script src="firebase-db.js"></script>
+</body>
+</html>
